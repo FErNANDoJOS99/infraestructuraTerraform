@@ -46,6 +46,13 @@ variable "subnet_private_cidr" {
   default     = "10.0.6.0/24"
 }
 
+variable "subnet_private_cidr2" {
+  type        = string
+  description = "CIDR for the first private subnet"
+  default     = "10.0.7.0/24"
+}
+
+
 variable "public_subnet_az_1" {
   description = "Availability zone for the first public subnet (e.g. us-east-1a)"
   type        = string
@@ -74,7 +81,7 @@ variable "private_subnet_az_4" {
 variable "private_subnet_az_1" {
   type        = string
   description = "Availability Zone for the first private subnet (e.g. us-east-1a)"
-  default     = "us-east-11"
+  default     = "us-east-1e"
 }
 
 variable "ec2_key_name" {
@@ -124,3 +131,4 @@ variable "db_password" {
   sensitive   = true
   default = "123456Absrc"
 }
+

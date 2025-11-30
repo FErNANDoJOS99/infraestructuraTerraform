@@ -4,6 +4,7 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    # Lo ocupa para generar llaves ssh
     tls = {
       source  = "hashicorp/tls"
       version = "~> 4.0"
