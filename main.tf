@@ -335,20 +335,20 @@ resource "aws_ecr_repository" "main" {
 
 
 
-# resource "aws_db_instance" "main" {
-#   identifier             = "${var.app_name}-db"
-#   db_name                = var.db_name
-#   engine                 = "postgres"
-#   instance_class         = var.db_instance_class
-#   allocated_storage      = 20
-#   storage_type           = "gp2"
-#   username               = var.db_user
-#   password               = var.db_password
-#   db_subnet_group_name   = # aws_db_subnet_group
-#   vpc_security_group_ids = [aws_security_group.rds.id]
-#   publicly_accessible    = false
-#   skip_final_snapshot    = true
-# }
+resource "aws_db_instance" "main" {
+  identifier             = "${var.app_name}-db"
+  db_name                = var.db_name
+  engine                 = "postgres"
+  instance_class         = var.db_instance_class
+  allocated_storage      = 20
+  storage_type           = "gp2"
+  username               = var.db_user
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.aws_db.id
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  publicly_accessible    = false
+  skip_final_snapshot    = true
+}
 
 
 
