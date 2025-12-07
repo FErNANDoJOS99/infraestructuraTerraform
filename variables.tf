@@ -16,6 +16,13 @@ variable "ecr_repo_name" {
   default     = "mi-app-repo"
 }
 
+variable "ecr_repo_name2" {
+  description = "Nombre del repositorio ECR para las imágenes Docker."
+  type        = string
+  default     = "mi-app-repo-front"
+}
+
+
 variable "vpc_cidr" {
   type        = string
   description = "VPC CIDR block"

@@ -13,7 +13,7 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_public_cidr_1
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
   availability_zone       = var.public_subnet_az_1
 
   tags = {
@@ -27,7 +27,7 @@ resource "aws_subnet" "public" {
 resource "aws_subnet" "public2" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_public_cidr_2
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
   availability_zone       = var.public_subnet_az_2
 
   tags = {
@@ -46,6 +46,36 @@ resource "aws_subnet" "public3" {
     Name = "${var.app_name}-subnet-3"
   }
 }
+
+
+
+# ==========================================
+# Elastic IP y asociación
+# ==========================================
+resource "aws_eip" "eip_terraform" {
+  domain = "vpc"
+}
+
+resource "aws_eip_association" "eip_terraform_assoc" {
+  instance_id   = aws_instance.front.id
+  allocation_id = aws_eip.eip_terraform.id
+
+}
+
+
+# Elastic IP y asociación2
+
+
+resource "aws_eip" "eip_terraform_2" {
+  domain = "vpc"
+}
+
+resource "aws_eip_association" "eip_terraform_assoc_2" {
+  instance_id   = aws_instance.back.id
+  allocation_id = aws_eip.eip_terraform_2.id
+}
+
+
 
 
 #----------------------------------
@@ -173,23 +203,36 @@ resource "aws_security_group" "ec2" {
   description = "Permitir acceso por ssh"
   vpc_id      = aws_vpc.main.id
 
-    # Inbound HTTP
+  #   #Inbound HTTP
+  # Tengo que habilitar que venga del 80 porque el loadbalancer lo 
+  # manda desde el 80
   ingress {
     description = "Allow HTTP"
     from_port   = 80
-    to_port     = 80
+    to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    security_groups = [aws_security_group.alb.id]
   }
 
-    # Inbound HTTPS
-  ingress {
-    description = "Allow HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  #    
+  # ingress {
+  #   description = "Allow HTTP"
+  #   from_port   = 3000
+  #   to_port     = 3000
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
+
+
+  #   # Inbound HTTPS ,no tengo el TLS asi lo dejo desactivado
+  # ingress {
+  #   description = "Allow HTTPS"
+  #   from_port   = 443
+  #   to_port     = 443
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
 
   #Para permitir ssh
   ingress {
@@ -228,6 +271,81 @@ resource "aws_security_group" "ec2" {
 
 
 
+# Segurity group del backend
+
+resource "aws_security_group" "ec2-backend" {
+  name        = "ec2-backend"
+  description = "Permitir acceso por ssh"
+  vpc_id      = aws_vpc.main.id
+
+    # Inbound HTTP
+  # ingress {
+  #   description = "Allow HTTP"
+  #   from_port   = 80
+  #   to_port     = 80
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  #   security_groups = [aws_security_group.alb.id]
+  # }
+
+
+    ingress {
+    description = "Allow HTTP"
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+  #   # Inbound HTTPS
+  # ingress {
+  #   description = "Allow HTTPS"
+  #   from_port   = 443
+  #   to_port     = 443
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
+
+  #Para permitir ssh
+  ingress {
+    description = "SSH desde tu IP"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    #cidr_blocks = ["${chomp(data.http.my_ip.body)}/32"]
+    #cidr_blocks = ["<IP-publica>/32"]
+    cidr_blocks = ["0.0.0.0/0"] # solo pruebas
+  }
+
+  ingress {
+    description = "Allow ICMP ping"
+    from_port   = -1
+    to_port     = -1
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  
+  # Allow all outbound
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"    # -1 = all protocols
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+
+    tags = {
+    Name = "ec2-sg-backend"
+  }
+}
+
+
+
+
+# SG  de la base de datos RDS
 
 resource "aws_security_group" "rds" {
   name        = "rds"
@@ -244,8 +362,6 @@ resource "aws_security_group" "rds" {
   }
 
 
-
-  
   # Allow all outbound
   egress {
     description = "Allow all outbound traffic"
@@ -286,7 +402,7 @@ resource "aws_db_subnet_group" "aws_db" {
 # ==========================================
 #     Generar llaves SSH 
 # ==========================================
-
+# Nota: Cuando se hace destroy si borra la llave de donde la creo 
 resource "tls_private_key" "ssh_key" {
   algorithm = "RSA"
   rsa_bits  = 4096
@@ -318,7 +434,7 @@ resource "local_file" "private_key" {
 # ==========================================
 #    crea un repositorio de imágenes Docker en Amazon ECR
 # ===========================================
-
+# Uno para el frontend y otro para el backend
 
 resource "aws_ecr_repository" "main" {
   name = var.ecr_repo_name
@@ -326,6 +442,15 @@ resource "aws_ecr_repository" "main" {
     scan_on_push = true
   }
 }
+
+
+resource "aws_ecr_repository" "main2" {
+  name = var.ecr_repo_name2
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
 
 
 
@@ -353,6 +478,39 @@ resource "aws_db_instance" "main" {
 
 
 
+# ==========================================
+# Creacion del ROL
+# ==========================================
+
+# Se crea un rol para poder descargar imagenes
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2-ecr-access-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_read_only" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "ec2-ecr-access-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
+
+
+
+
+
 
 
 # =========================================
@@ -372,11 +530,12 @@ resource "aws_instance" "front" {
   ami                    = data.aws_ssm_parameter.amazon_linux_2_ami.value
   instance_type          = var.ec2_instance_type
   key_name               = aws_key_pair.generated_key.key_name
-  subnet_id              = aws_subnet.public2.id
+  subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.ec2.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name 
 
   tags = {
-    Name = "${var.app_name}-instance"
+    Name = "${var.app_name}-frontend"
   }
       user_data = <<-EOF
     #!/bin/bash
@@ -384,6 +543,15 @@ resource "aws_instance" "front" {
     yum install -y docker
     systemctl start docker
     systemctl enable docker
+
+
+
+    # Agregar ec2-user al grupo docker
+    usermod -aG docker ec2-user
+
+    # Permitir que el usuario use docker sin reiniciar (solo aplicable en cloud-init)
+    # newgrp docker # opcional
+
     EOF
 
 
@@ -397,11 +565,12 @@ resource "aws_instance" "back" {
   ami                    = data.aws_ssm_parameter.amazon_linux_2_ami.value
   instance_type          = var.ec2_instance_type
   key_name               = aws_key_pair.generated_key.key_name
-  subnet_id              = aws_subnet.public3.id
-  vpc_security_group_ids = [aws_security_group.ec2.id]
+  subnet_id              = aws_subnet.public2.id
+  vpc_security_group_ids = [aws_security_group.ec2-backend.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name 
 
   tags = {
-    Name = "${var.app_name}-instance"
+    Name = "${var.app_name}-backend"
   }
 
       user_data = <<-EOF
@@ -410,6 +579,15 @@ resource "aws_instance" "back" {
     yum install -y docker
     systemctl start docker
     systemctl enable docker
+
+
+    # Agregar ec2-user al grupo docker
+    usermod -aG docker ec2-user
+
+    # Permitir que el usuario use docker sin reiniciar (solo aplicable en cloud-init)
+    # newgrp docker # opcional
+
+
     EOF
 
 
@@ -473,4 +651,33 @@ resource "aws_lb_target_group_attachment" "att" {
   #port             = 80
 }
 
+
+#====================================================
+#      Servicio de route 53 
+# ===================================================
+
+
+
+resource "aws_route53_zone" "primary" {
+  name = "ingsoftware2.publicvm.com"
+}
+
+# Para imprimir los 4 nameservers
+output "route53_nameservers" {
+  value = aws_route53_zone.primary.name_servers
+}
+
+# Crear el registro DNS
+resource "aws_route53_record" "alb_record" {
+  zone_id = aws_route53_zone.primary.zone_id
+  name    = "ingsoftware2.publicvm.com"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.main.dns_name
+    # Para saber en que zona vive el servicio al que apunta
+    zone_id                = aws_lb.main.zone_id
+    evaluate_target_health = true
+  }
+}
 
