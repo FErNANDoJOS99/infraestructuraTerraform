@@ -1,4 +1,4 @@
-#TerraformInfrastructure
+# TerraformInfrastructure
 The necessary infrastructure will be set up on AWS using Terraform to host a website.
 ## Steps
 
